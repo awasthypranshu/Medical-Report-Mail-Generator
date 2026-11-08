@@ -1,211 +1,210 @@
-# 💡 Business Idea Predictor & Generator
+# 🩺 MediNotes Pro — Medical Report & Patient Mail Generator
 
-An AI-powered SaaS web application that generates, analyzes, and predicts innovative business ideas with a focus on autonomous AI agents. Built with a **Next.js 16** frontend and a high-performance **FastAPI** backend, featuring real-time Server-Sent Events (SSE) streaming powered by **Groq Cloud**.
+[![Next.js](https://img.shields.io/badge/Next.js-16.4.5-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19.3.0-blue?style=for-the-badge&logo=react)](https://react.dev/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com/)
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python)](https://python.org/)
+[![Clerk](https://img.shields.io/badge/Clerk-Core_3-6C47FF?style=for-the-badge&logo=clerk)](https://clerk.com/)
+[![Groq](https://img.shields.io/badge/Groq-LPU_Inference-F05A28?style=for-the-badge)](https://groq.com/)
+[![Vercel](https://img.shields.io/badge/Vercel-Deployed-black?style=for-the-badge&logo=vercel)](https://vercel.com/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
+
+An enterprise-ready, full-stack AI SaaS application engineered for healthcare professionals. **MediNotes Pro** transforms raw, unstructured clinical consultation notes into formatted medical records, actionable clinical next steps, and empathetic, patient-friendly follow-up emails in real time.
+
+Built with a high-performance polyglot architecture combining a **Next.js 16 (React 19)** frontend with a **FastAPI** Python backend, featuring **JWKS cryptographic authentication**, **token-by-token Server-Sent Events (SSE) streaming**, and **Clerk Core 3 subscription gating**.
 
 ---
 
-## 🚀 Features
+## 🌟 Core Highlights & Architectural Strengths
 
-- **⚡ Real-Time Token Streaming**: Streams generated business ideas token-by-token using Server-Sent Events (`EventSource` + `StreamingResponse`), delivering instant feedback without loading freezes.
-- **🧠 Ultra-Fast Groq Inference**: Powered by Groq's high-throughput LPU inference running state-of-the-art open models (`openai/gpt-oss-120b`).
-- **📝 Formatted Markdown Presentation**: Full GitHub Flavored Markdown (GFM) rendering with `react-markdown`, `remark-gfm`, and `remark-breaks` for structured headings, bullet points, and roadmaps.
-- **🎨 Modern Glassmorphic UI**: Sleek, responsive card design styled with Tailwind CSS v4, supporting dynamic dark and light mode aesthetics.
-- **☁️ Serverless-Ready Architecture**: Built to deploy seamlessly on Vercel with zero-configuration hybrid Next.js frontend and Python serverless functions.
+In today's AI engineering and full-stack landscape, production-grade applications require far more than basic API wrappers. This project demonstrates battle-tested software engineering practices:
 
----
-
-## 🛠️ Tech Stack
-
-| Layer | Technology | Description |
-|---|---|---|
-| **Frontend Framework** | [Next.js 16](https://nextjs.org/) (Pages Router) | React framework with Turbopack support |
-| **UI Library** | [React 19](https://react.dev/) | Declarative modern user interface |
-| **Language** | [TypeScript](https://www.typescriptlang.org/) & [Python 3.10+](https://www.python.org/) | Type-safe frontend and backend code |
-| **Styling** | [Tailwind CSS v4](https://tailwindcss.com/) | Modern utility-first CSS framework |
-| **Markdown** | `react-markdown` + `remark-gfm` + `remark-breaks` | Live rendering of streaming markdown text |
-| **Backend API** | [FastAPI](https://fastapi.tiangolo.com/) | High-performance Python async web framework |
-| **AI Engine** | [Groq Cloud](https://groq.com/) | Ultra-low latency LLM inference via OpenAI SDK |
-| **Deployment** | [Vercel](https://vercel.com/) | Hybrid serverless Next.js + Python deployment |
+- **⚡ Sub-Second Token Streaming via SSE**: Replaces slow, buffered HTTP requests with real-time Server-Sent Events (`fetchEventSource` + FastAPI `StreamingResponse`), delivering an ultra-responsive interface with live Markdown rendering as tokens stream from Groq's LPUs.
+- **🔐 End-to-End Cryptographic JWT Auth**: The FastAPI microservice does not rely on opaque headers; it cryptographically validates incoming Clerk session JWTs directly against Clerk's remote JSON Web Key Set (`JWKS`) endpoint on every request.
+- **💳 Modern Subscription Entitlements (Clerk Core 3)**: Implements cutting-edge declarative authorization using Clerk Core 3's `<Show when={(has) => ...}>` primitives, seamlessly synchronizing frontend UI protection with active Stripe/Clerk billing tiers.
+- **🧠 Domain-Specific Clinical Prompt Engineering**: Translates complex, medical shorthand into structured tripartite outputs:
+  1. **Physician Record Summary**: Formal, objective clinical documentation.
+  2. **Action Items**: Explicit diagnostic, medication, and referral checklists.
+  3. **Patient-Friendly Communication**: Accessible, compassionate discharge instructions in plain language.
+- **☁️ Polyglot Vercel Serverless Architecture**: Next.js client and FastAPI Python serverless functions co-exist in a unified monorepo with automated routing, zero configuration drift, and CI/CD deployment parity.
 
 ---
 
 ## 🏗️ Architecture & Data Flow
 
 ```mermaid
-flowchart LR
-    User([User / Browser])
-    
-    subgraph Frontend ["Next.js Frontend (React 19)"]
-        UI["UI Card / State"]
-        ES["EventSource('/api')"]
-        MD["ReactMarkdown + GFM"]
+sequenceDiagram
+    autonumber
+    actor Doctor as Healthcare Professional
+    participant Client as Next.js 16 (React 19 + Clerk)
+    participant Clerk as Clerk Auth & Billing
+    participant API as FastAPI Serverless (/api)
+    participant Groq as Groq LPU (gpt-oss-120b)
+
+    Doctor->>Client: Access /product
+    Client->>Clerk: Check active subscription (has({ plan: "busy_lobster" }))
+    alt Subscription Inactive
+        Client-->>Doctor: Render <PricingTable /> with Stripe checkout
+    else Subscription Active
+        Client-->>Doctor: Display Consultation Notes Form
     end
+
+    Doctor->>Client: Submit Patient Name, Date, Clinical Notes
+    Client->>Clerk: getToken() -> Fetch fresh RS256 JWT
+    Client->>API: POST /api (Authorization: Bearer <JWT> + JSON payload)
     
-    subgraph Backend ["FastAPI Backend (/api/index.py)"]
-        Endpoint["GET /api"]
-        StreamGenerator["StreamingResponse (text/event-stream)"]
+    critical Cryptographic Validation
+        API->>Clerk: Fetch / Cache JWKS public keys
+        API->>API: Verify JWT signature & decode claims (sub / user_id)
     end
-    
-    subgraph AI ["Groq Cloud Inference"]
-        GroqAPI["Groq LPU Engine\n(openai/gpt-oss-120b)"]
-    end
-    
-    User -->|Open Page| UI
-    UI -->|Mount useEffect| ES
-    ES -->|GET Request| Endpoint
-    Endpoint -->|client.chat.completions.create(stream=True)| GroqAPI
-    GroqAPI -.->|Token Chunks| StreamGenerator
-    StreamGenerator -.->|SSE Events data: ...| ES
-    ES -->|Incremental buffer update| MD
-    MD -->|Render live idea| User
+
+    API->>Groq: client.chat.completions.create(stream=True)
+    Groq-->>API: Stream token chunks at ~300+ tok/sec
+    API-->>Client: Stream SSE chunks (data: <token>\n\n)
+    Client-->>Doctor: Real-time Markdown rendering with typography
 ```
 
 ---
 
-## 📁 Project Structure
+## 🛠️ Technology Stack
+
+| Layer | Technology | Engineering Rationale |
+|---|---|---|
+| **Frontend Framework** | [Next.js 16.4](https://nextjs.org/) | Turbo-powered build performance, optimized static prerendering, and modern routing. |
+| **UI Library** | [React 19](https://react.dev/) | Leverages the latest React concurrent features and component lifecycle optimizations. |
+| **Type Safety** | [TypeScript 5](https://www.typescriptlang.org/) | Strict typing across UI components, event handlers, and data payloads. |
+| **Styling** | [Tailwind CSS v4](https://tailwindcss.com/) + Typography | Modern CSS engine with `@tailwindcss/typography` for clinical document styling. |
+| **Auth & Billing** | [Clerk Core 3](https://clerk.com/) | Unified user management, session token generation, and plan entitlement enforcement. |
+| **Backend API** | [FastAPI](https://fastapi.tiangolo.com/) + Pydantic | Asynchronous Python framework with strict request payload validation schemas. |
+| **Auth Middleware** | `fastapi-clerk-auth` | Cryptographic JWT verification via Clerk JWKS public keys. |
+| **Inference Engine** | [Groq Cloud](https://groq.com/) | Hardware-accelerated LPU inference utilizing `openai/gpt-oss-120b` for minimal latency. |
+| **Real-Time Streaming** | `@microsoft/fetch-event-source` | Resilient SSE connection handling with custom headers and abort signal controls. |
+| **Hosting & CI/CD** | [Vercel](https://vercel.com/) | Serverless deployment combining Next.js edge assets with Python serverless functions. |
+
+---
+
+## 📁 Repository Structure
 
 ```text
 ├── api/
-│   └── index.py             # FastAPI backend with Groq streaming endpoint (/api)
+│   └── index.py             # FastAPI serverless backend (Pydantic validation, JWKS guard, Groq stream)
 ├── pages/
-│   ├── _app.tsx             # Global application wrapper and style imports
-│   ├── _document.tsx        # HTML document structure and SEO meta tags
-│   └── index.tsx            # Main page with SSE EventSource and Markdown viewer
-├── public/                  # Static assets and favicons
+│   ├── _app.tsx             # Global application wrapper with ClerkProvider & styles
+│   ├── _document.tsx        # HTML document shell with accessibility & metadata
+│   ├── index.tsx            # Marketing landing page with features grid and auth controls
+│   └── product.tsx          # Protected consultation suite with plan entitlement checks
+├── public/                  # Favicons and static web assets
 ├── styles/
-│   └── globals.css          # Tailwind CSS v4 imports and custom markdown styles
-├── .env.example             # Example environment variables template
-├── .gitignore               # Git ignore rules for Next.js, Python, and secrets
-├── next.config.ts           # Next.js and Turbopack configuration
-├── package.json             # Frontend dependencies and npm scripts
-├── requirements.txt         # Python dependencies for FastAPI backend
-└── tsconfig.json            # TypeScript configuration
+│   └── globals.css          # Tailwind CSS v4 styling rules
+├── .env.example             # Documented template for required environment variables
+├── .gitignore               # Strict ignore rules preventing credential leaks
+├── next.config.ts           # Next.js and Turbopack compiler configuration
+├── package.json             # Frontend dependencies and deployment scripts
+├── requirements.txt         # Python dependencies for the FastAPI runtime
+└── tsconfig.json            # Strict TypeScript configuration
 ```
 
 ---
 
-## ⚙️ Getting Started
+## 🔒 Security & Compliance Considerations
+
+- **Zero Credential Exposure**: Client-side code strictly consumes public keys (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`). All backend secrets (`CLERK_SECRET_KEY`, `GROQ_API_KEY`, `CLERK_JWKS_URL`) remain isolated inside server-side environments.
+- **Cryptographic Token Verification**: In order to prevent spoofed user IDs, the backend authenticates every request using public keys published by Clerk's JWKS (`.well-known/jwks.json`).
+- **Pydantic Validation**: All incoming requests to `/api` are parsed and validated through the `Visit` Pydantic model, rejecting malformed payloads before invoking downstream inference.
+- **Request Cancellation**: Frontend employs `AbortController` alongside `@microsoft/fetch-event-source` to gracefully close active streams if the user navigates away or cancels, avoiding runaway LLM inference costs.
+
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
 
-Ensure you have the following installed on your system:
-- **Node.js** 18.x or higher
-- **npm**, **pnpm**, or **yarn**
+Ensure you have the following installed locally:
+- **Node.js** 20.x or higher
+- **npm** or **pnpm**
 - **Python** 3.10 or higher
-- A **Groq API Key** (Get one for free at [console.groq.com](https://console.groq.com/keys))
+- **Vercel CLI** (`npm i -g vercel`)
 
----
-
-### Installation
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/awasthypranshu/Buisness-Idea-Predictor.git
-   cd Buisness-Idea-Predictor
-   ```
-
-2. **Install Frontend Dependencies:**
-   ```bash
-   npm install
-   ```
-
-3. **Install Python Dependencies:**
-   ```bash
-   # Create and activate a virtual environment (optional but recommended)
-   python -m venv .venv
-
-   # On Windows:
-   .venv\Scripts\activate
-   # On macOS/Linux:
-   source .venv/bin/activate
-
-   # Install dependencies
-   pip install -r requirements.txt
-   ```
-
-4. **Configure Environment Variables:**
-   Create a `.env.local` file in the root directory:
-   ```bash
-   cp .env.example .env.local
-   ```
-   Open `.env.local` and add your Groq API key:
-   ```env
-   GROQ_API_KEY=gsk_your_actual_groq_api_key_here
-   ```
-
----
-
-### Running Locally
-
-#### Option A: Using Vercel CLI (Recommended)
-The Vercel CLI automatically runs both the Next.js frontend and the FastAPI serverless function concurrently:
+### 1. Clone & Install Dependencies
 
 ```bash
-# Install Vercel CLI globally (if not already installed)
-npm i -g vercel
+git clone https://github.com/awasthypranshu/Medical-Report-Mail-Generator.git
+cd Medical-Report-Mail-Generator
 
-# Run the local development server with environment variables
-vercel dev
+# Install frontend dependencies
+npm install
+
+# (Optional) Set up Python virtual environment for local backend testing
+python -m venv venv
+# On Windows:
+.\venv\Scripts\activate
+# On macOS/Linux:
+source venv/bin/activate
+
+pip install -r requirements.txt
 ```
-Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-#### Option B: Running Concurrently (Manual)
-If you prefer running the Next.js dev server and FastAPI separately:
+### 2. Configure Environment Variables
 
-1. **Terminal 1 - FastAPI Server:**
+Create a `.env.local` file in the root directory:
+
+```bash
+cp .env.example .env.local
+```
+
+Fill in your respective API keys:
+
+```env
+# Groq API Key (Obtain from https://console.groq.com/keys)
+GROQ_API_KEY=gsk_...
+
+# Clerk Auth Keys (Obtain from https://dashboard.clerk.com)
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
+CLERK_JWKS_URL=https://<your-subdomain>.clerk.accounts.dev/.well-known/jwks.json
+```
+
+### 3. Run Locally
+
+```bash
+# Start Next.js development server
+npm run dev
+```
+
+Visit `http://localhost:3000` in your browser.
+
+---
+
+## ☁️ Deployment (Vercel)
+
+The repository is pre-configured for Vercel's hybrid Next.js + Python serverless execution:
+
+1. Link your project to Vercel:
    ```bash
-   uvicorn api.index:app --reload --port 8000
+   vercel
    ```
-2. **Terminal 2 - Next.js Development Server:**
+2. Set your environment variables in the Vercel dashboard or CLI:
    ```bash
-   npm run dev
+   vercel env add NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+   vercel env add CLERK_SECRET_KEY
+   vercel env add CLERK_JWKS_URL
+   vercel env add GROQ_API_KEY
+   ```
+3. Deploy to production:
+   ```bash
+   vercel --prod
    ```
 
 ---
 
-## 🔑 Environment Variables
+## 👨‍💻 Developer & Contact
 
-| Variable | Required | Description |
-|---|---|---|
-| `GROQ_API_KEY` | **Yes** | Your API key from Groq Cloud used to authenticate completions requests. |
-
----
-
-## 📡 API Reference
-
-### `GET /api`
-
-Generates and streams an AI-agent business proposal using Server-Sent Events (SSE).
-
-- **Request Headers**: `Accept: text/event-stream`
-- **Response Headers**: 
-  - `Content-Type: text/event-stream`
-  - `Cache-Control: no-cache`
-- **Response Format**:
-  ```text
-  data: ## Autonomous Quality Assurance Agent
-  
-  data: ### Executive Summary
-  
-  data: - Automated end-to-end testing platform
-  data: - Adapts to UI changes dynamically
-  ```
-
----
-
-## 🚀 Deployment to Vercel
-
-This repository is pre-configured for one-click deployment on [Vercel](https://vercel.com):
-
-1. Push your repository to GitHub.
-2. Go to [Vercel](https://vercel.com/new) and import the repository: `awasthypranshu/Buisness-Idea-Predictor`.
-3. Under **Environment Variables**, add:
-   - Key: `GROQ_API_KEY`
-   - Value: `<your-groq-api-key>`
-4. Click **Deploy**. Vercel will automatically build the Next.js pages and host the Python FastAPI endpoint as a Serverless Function.
+**Pranshu Awasthy**  
+- **GitHub**: [@awasthypranshu](https://github.com/awasthypranshu)
+- **Project Repository**: [Medical-Report-Mail-Generator](https://github.com/awasthypranshu/Medical-Report-Mail-Generator)
 
 ---
 
 ## 📄 License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
