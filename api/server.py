@@ -28,7 +28,7 @@ if not jwks_url or not jwks_url.strip():
     )
 
 clerk_config = ClerkConfig(jwks_url=jwks_url.strip())
-clerk_guard = ClerkHTTPBearer(clerk_config)
+clerk_guard = ClerkHTTPBearer(clerk_config, debug_mode=True)
 
 class Visit(BaseModel):
     patient_name: str

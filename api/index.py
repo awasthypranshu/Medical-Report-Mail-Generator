@@ -6,8 +6,8 @@ from fastapi_clerk_auth import ClerkConfig, ClerkHTTPBearer, HTTPAuthorizationCr
 from openai import OpenAI  # type: ignore
 
 app = FastAPI()
-clerk_config = ClerkConfig(jwks_url=os.getenv("CLERK_JWKS_URL"))
-clerk_guard = ClerkHTTPBearer(clerk_config)
+clerk_config = ClerkConfig(jwks_url=os.getenv("CLERK_JWKS_URL", "").strip())
+clerk_guard = ClerkHTTPBearer(clerk_config, debug_mode=True)
 
 
 class Visit(BaseModel):
