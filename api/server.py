@@ -1,34 +1,14 @@
 import os
 from pathlib import Path
-from typing import Optional
-from fastapi import FastAPI, Depends, HTTPException, Request
-from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
+from fastapi import FastAPI, Depends, HTTPException
+from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security.utils import get_authorization_scheme_param
 from pydantic import BaseModel
-import jwt
-from fastapi.encoders import jsonable_encoder
 from fastapi_clerk_auth import ClerkConfig, ClerkHTTPBearer, HTTPAuthorizationCredentials
-from jwt.exceptions import ExpiredSignatureError, PyJWTError
 from openai import OpenAI
 
 app = FastAPI()
-
-# Exception handlers for JWT errors
-@app.exception_handler(ExpiredSignatureError)
-async def expired_signature_handler(request: Request, exc: ExpiredSignatureError):
-    return JSONResponse(
-        status_code=401,
-        content={"detail": "Token signature has expired. Please refresh the page."},
-    )
-
-@app.exception_handler(PyJWTError)
-async def jwt_error_handler(request: Request, exc: PyJWTError):
-    return JSONResponse(
-        status_code=401,
-        content={"detail": f"Invalid authentication token: {str(exc)}"},
-    )
 
 # Add CORS middleware (allows frontend to call backend)
 app.add_middleware(
@@ -47,51 +27,11 @@ if not jwks_url or not jwks_url.strip():
         "Make sure to run Docker with --env-file .env"
     )
 
-class CustomClerkHTTPBearer(ClerkHTTPBearer):
-    def _decode_token(self, token: str) -> dict | None:
-        try:
-            signing_key = self.jwks_client.get_signing_key_from_jwt(token)
-            decoded_token = jwt.decode(
-                token,
-                key=signing_key.key,
-                audience=self.audience,
-                issuer=self.issuer,
-                algorithms=["RS256"],
-                options={
-                    "verify_exp": self.config.verify_exp,
-                    "verify_aud": self.config.verify_aud,
-                    "verify_iss": self.config.verify_iss,
-                    "verify_iat": self.config.verify_iat,
-                },
-                leeway=self.config.leeway,
-            )
-            return dict(jsonable_encoder(decoded_token))
-        except Exception as e:
-            print(f"--> [Clerk Auth Error]: {type(e).__name__}: {e}", flush=True)
-            return None
-
-    async def __call__(self, request: Request) -> Optional[HTTPAuthorizationCredentials]:
-        authorization = request.headers.get("Authorization")
-        if not authorization:
-            print("--> [Clerk Auth Error]: No Authorization header sent by client!", flush=True)
-            raise HTTPException(status_code=401, detail="Missing Authorization header")
-        scheme, credentials = get_authorization_scheme_param(authorization)
-        if scheme.lower() != "bearer":
-            print(f"--> [Clerk Auth Error]: Invalid scheme '{scheme}'", flush=True)
-            raise HTTPException(status_code=401, detail="Invalid auth scheme, Bearer required")
-
-        decoded_token = self._decode_token(token=credentials)
-        if not decoded_token:
-            raise HTTPException(status_code=401, detail="Invalid or expired authentication token. Please refresh the page.")
-
-        return HTTPAuthorizationCredentials(scheme=scheme, credentials=credentials, decoded=decoded_token)
-
-# leeway=60 gives 60 seconds tolerance for clock skew and near-expiry tokens
 clerk_config = ClerkConfig(
     jwks_url=jwks_url.strip(),
     leeway=60,
 )
-clerk_guard = CustomClerkHTTPBearer(clerk_config, debug_mode=False)
+clerk_guard = ClerkHTTPBearer(clerk_config, debug_mode=False)
 
 class Visit(BaseModel):
     patient_name: str
@@ -120,8 +60,6 @@ def consultation_summary(
     visit: Visit,
     creds: HTTPAuthorizationCredentials = Depends(clerk_guard),
 ):
-    user_id = creds.decoded["sub"]
-
     groq_api_key = os.getenv("GROQ_API_KEY")
     if not groq_api_key:
         raise HTTPException(
@@ -163,11 +101,27 @@ def health_check():
     """Health check endpoint (used for local Docker; Lambda does not invoke it)"""
     return {"status": "healthy"}
 
-# Serve static files (our Next.js export) - MUST BE LAST!
+# Serve Next.js static export files - MUST BE LAST!
 static_path = Path("static")
 if static_path.exists():
+    # Mount /_next static assets directly so chunks & css load with high performance
+    if (static_path / "_next").exists():
+        app.mount("/_next", StaticFiles(directory=str(static_path / "_next")), name="next_assets")
+
     @app.get("/")
     async def serve_root():
         return FileResponse(static_path / "index.html")
 
-    app.mount("/", StaticFiles(directory="static", html=True), name="static")
+    @app.get("/product")
+    async def serve_product():
+        return FileResponse(static_path / "product.html")
+
+    @app.get("/{full_path:path}")
+    async def serve_fallback(full_path: str):
+        target = static_path / full_path
+        if target.is_file():
+            return FileResponse(target)
+        target_html = static_path / f"{full_path}.html"
+        if target_html.is_file():
+            return FileResponse(target_html)
+        return FileResponse(static_path / "index.html")
