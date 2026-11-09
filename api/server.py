@@ -20,7 +20,14 @@ app.add_middleware(
 )
 
 # Clerk authentication setup
-clerk_config = ClerkConfig(jwks_url=os.getenv("CLERK_JWKS_URL"))
+jwks_url = os.getenv("CLERK_JWKS_URL")
+if not jwks_url or not jwks_url.strip():
+    raise ValueError(
+        "CLERK_JWKS_URL environment variable is missing or empty! "
+        "Make sure to run Docker with --env-file .env"
+    )
+
+clerk_config = ClerkConfig(jwks_url=jwks_url.strip())
 clerk_guard = ClerkHTTPBearer(clerk_config)
 
 class Visit(BaseModel):
