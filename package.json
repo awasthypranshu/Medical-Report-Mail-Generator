@@ -11,8 +11,10 @@
   "dependencies": {
     "@clerk/nextjs": "^7.9.25",
     "@microsoft/fetch-event-source": "^2.0.1",
+    "@tailwindcss/postcss": "^4.3.5",
     "@tailwindcss/typography": "^0.5.20",
     "next": "16.4.5",
+    "postcss": "^8.5.32",
     "react": "19.3.0",
     "react-datepicker": "^9.1.0",
     "react-dom": "19.3.0",
@@ -21,7 +23,6 @@
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
-    "@tailwindcss/turbopack": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-datepicker": "^6.2.0",
