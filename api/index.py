@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI, Depends  # type: ignore
+from fastapi import FastAPI, Depends, HTTPException  # type: ignore
 from fastapi.responses import StreamingResponse  # type: ignore
 from pydantic import BaseModel  # type: ignore
 from fastapi_clerk_auth import ClerkConfig, ClerkHTTPBearer, HTTPAuthorizationCredentials  # type: ignore
@@ -35,14 +35,22 @@ Notes:
 
 
 @app.post("/api")
+@app.post("/api/consultation")
 def consultation_summary(
     visit: Visit,
     creds: HTTPAuthorizationCredentials = Depends(clerk_guard),
 ):
     user_id = creds.decoded["sub"]
 
+    groq_api_key = os.getenv("GROQ_API_KEY")
+    if not groq_api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="GROQ_API_KEY environment variable is not configured."
+        )
+
     client = OpenAI(
-        api_key=os.getenv("GROQ_API_KEY"),
+        api_key=groq_api_key,
         base_url="https://api.groq.com/openai/v1"
     )
 

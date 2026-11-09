@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -44,6 +44,7 @@ Date of Visit: {visit.date_of_visit}
 Notes:
 {visit.notes}"""
 
+@app.post("/api")
 @app.post("/api/consultation")
 def consultation_summary(
     visit: Visit,
@@ -51,8 +52,15 @@ def consultation_summary(
 ):
     user_id = creds.decoded["sub"]
 
+    groq_api_key = os.getenv("GROQ_API_KEY")
+    if not groq_api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="GROQ_API_KEY environment variable is not configured."
+        )
+
     client = OpenAI(
-        api_key=os.getenv("GROQ_API_KEY"),
+        api_key=groq_api_key,
         base_url="https://api.groq.com/openai/v1"
     )
 
