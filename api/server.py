@@ -1,10 +1,14 @@
 import os
 from pathlib import Path
+from typing import Optional
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security.utils import get_authorization_scheme_param
 from pydantic import BaseModel
+import jwt
+from fastapi.encoders import jsonable_encoder
 from fastapi_clerk_auth import ClerkConfig, ClerkHTTPBearer, HTTPAuthorizationCredentials
 from jwt.exceptions import ExpiredSignatureError, PyJWTError
 from openai import OpenAI
@@ -43,12 +47,51 @@ if not jwks_url or not jwks_url.strip():
         "Make sure to run Docker with --env-file .env"
     )
 
+class CustomClerkHTTPBearer(ClerkHTTPBearer):
+    def _decode_token(self, token: str) -> dict | None:
+        try:
+            signing_key = self.jwks_client.get_signing_key_from_jwt(token)
+            decoded_token = jwt.decode(
+                token,
+                key=signing_key.key,
+                audience=self.audience,
+                issuer=self.issuer,
+                algorithms=["RS256"],
+                options={
+                    "verify_exp": self.config.verify_exp,
+                    "verify_aud": self.config.verify_aud,
+                    "verify_iss": self.config.verify_iss,
+                    "verify_iat": self.config.verify_iat,
+                },
+                leeway=self.config.leeway,
+            )
+            return dict(jsonable_encoder(decoded_token))
+        except Exception as e:
+            print(f"--> [Clerk Auth Error]: {type(e).__name__}: {e}", flush=True)
+            return None
+
+    async def __call__(self, request: Request) -> Optional[HTTPAuthorizationCredentials]:
+        authorization = request.headers.get("Authorization")
+        if not authorization:
+            print("--> [Clerk Auth Error]: No Authorization header sent by client!", flush=True)
+            raise HTTPException(status_code=401, detail="Missing Authorization header")
+        scheme, credentials = get_authorization_scheme_param(authorization)
+        if scheme.lower() != "bearer":
+            print(f"--> [Clerk Auth Error]: Invalid scheme '{scheme}'", flush=True)
+            raise HTTPException(status_code=401, detail="Invalid auth scheme, Bearer required")
+
+        decoded_token = self._decode_token(token=credentials)
+        if not decoded_token:
+            raise HTTPException(status_code=401, detail="Invalid or expired authentication token. Please refresh the page.")
+
+        return HTTPAuthorizationCredentials(scheme=scheme, credentials=credentials, decoded=decoded_token)
+
 # leeway=60 gives 60 seconds tolerance for clock skew and near-expiry tokens
 clerk_config = ClerkConfig(
     jwks_url=jwks_url.strip(),
     leeway=60,
 )
-clerk_guard = ClerkHTTPBearer(clerk_config, debug_mode=False)
+clerk_guard = CustomClerkHTTPBearer(clerk_config, debug_mode=False)
 
 class Visit(BaseModel):
     patient_name: str
