@@ -1,14 +1,30 @@
 import os
 from pathlib import Path
-from fastapi import FastAPI, Depends, HTTPException
-from fastapi.responses import StreamingResponse, FileResponse
+from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from fastapi_clerk_auth import ClerkConfig, ClerkHTTPBearer, HTTPAuthorizationCredentials
+from jwt.exceptions import ExpiredSignatureError, PyJWTError
 from openai import OpenAI
 
 app = FastAPI()
+
+# Exception handlers for JWT errors
+@app.exception_handler(ExpiredSignatureError)
+async def expired_signature_handler(request: Request, exc: ExpiredSignatureError):
+    return JSONResponse(
+        status_code=401,
+        content={"detail": "Token signature has expired. Please refresh the page."},
+    )
+
+@app.exception_handler(PyJWTError)
+async def jwt_error_handler(request: Request, exc: PyJWTError):
+    return JSONResponse(
+        status_code=401,
+        content={"detail": f"Invalid authentication token: {str(exc)}"},
+    )
 
 # Add CORS middleware (allows frontend to call backend)
 app.add_middleware(
@@ -27,8 +43,12 @@ if not jwks_url or not jwks_url.strip():
         "Make sure to run Docker with --env-file .env"
     )
 
-clerk_config = ClerkConfig(jwks_url=jwks_url.strip())
-clerk_guard = ClerkHTTPBearer(clerk_config, debug_mode=True)
+# leeway=60 gives 60 seconds tolerance for clock skew and near-expiry tokens
+clerk_config = ClerkConfig(
+    jwks_url=jwks_url.strip(),
+    leeway=60,
+)
+clerk_guard = ClerkHTTPBearer(clerk_config, debug_mode=False)
 
 class Visit(BaseModel):
     patient_name: str

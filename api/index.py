@@ -1,13 +1,32 @@
 import os
-from fastapi import FastAPI, Depends, HTTPException  # type: ignore
-from fastapi.responses import StreamingResponse  # type: ignore
+from fastapi import FastAPI, Depends, HTTPException, Request  # type: ignore
+from fastapi.responses import StreamingResponse, JSONResponse  # type: ignore
 from pydantic import BaseModel  # type: ignore
 from fastapi_clerk_auth import ClerkConfig, ClerkHTTPBearer, HTTPAuthorizationCredentials  # type: ignore
+from jwt.exceptions import ExpiredSignatureError, PyJWTError  # type: ignore
 from openai import OpenAI  # type: ignore
 
 app = FastAPI()
-clerk_config = ClerkConfig(jwks_url=os.getenv("CLERK_JWKS_URL", "").strip())
-clerk_guard = ClerkHTTPBearer(clerk_config, debug_mode=True)
+
+@app.exception_handler(ExpiredSignatureError)
+async def expired_signature_handler(request: Request, exc: ExpiredSignatureError):
+    return JSONResponse(
+        status_code=401,
+        content={"detail": "Token signature has expired. Please refresh the page."},
+    )
+
+@app.exception_handler(PyJWTError)
+async def jwt_error_handler(request: Request, exc: PyJWTError):
+    return JSONResponse(
+        status_code=401,
+        content={"detail": f"Invalid authentication token: {str(exc)}"},
+    )
+
+clerk_config = ClerkConfig(
+    jwks_url=os.getenv("CLERK_JWKS_URL", "").strip(),
+    leeway=60,
+)
+clerk_guard = ClerkHTTPBearer(clerk_config, debug_mode=False)
 
 
 class Visit(BaseModel):

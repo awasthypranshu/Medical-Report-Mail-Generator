@@ -26,7 +26,8 @@ function ConsultationForm() {
         setOutput('');
         setLoading(true);
 
-        const jwt = await getToken();
+        // Fetch fresh token (skipping memory cache) to prevent ExpiredSignatureError
+        const jwt = (await getToken({ skipCache: true })) || (await getToken());
         if (!jwt) {
             setOutput('Authentication required');
             setLoading(false);
@@ -48,6 +49,19 @@ function ConsultationForm() {
                 date_of_visit: visitDate?.toISOString().slice(0, 10),
                 notes,
             }),
+            async onopen(response) {
+                if (!response.ok) {
+                    controller.abort();
+                    setLoading(false);
+                    if (response.status === 401 || response.status === 403) {
+                        setOutput('Session token expired or unauthorized. Please refresh the page and try again.');
+                    } else {
+                        const err = await response.text();
+                        setOutput(`Error (${response.status}): ${err || response.statusText}`);
+                    }
+                    throw new Error(`Server returned HTTP ${response.status}`);
+                }
+            },
             onmessage(ev) {
                 buffer += ev.data;
                 setOutput(buffer);
